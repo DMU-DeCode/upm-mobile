@@ -1,17 +1,59 @@
-# upm_app
+# 📱 Real-time Sensor Monitoring Mobile App (Flutter)
 
-A new Flutter project.
+이 레포지토리는 C# 데이터 생성기와 Python 서버로부터 전송되는 실시간 센서 데이터를 모니터링하는 **Flutter 모바일 애플리케이션**입니다.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🛠️ 시스템 아키텍처 (System Architecture)
+본 앱은 단독으로 작동하지 않으며, 아래 구성 요소와 함께 작동합니다.
+1. **Data Source (C#)**: 실시간 센서 데이터 생성
+2. **Backend (Python)**: FastAPI/Uvicorn 서버 (Port: 8000)
+3. **Tunneling (ngrok)**: 로컬 서버를 외부로 노출
+4. **Mobile App (Flutter)**: ngrok 주소를 통해 실시간 데이터 시각화
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## ⚙️ 사전 설정 (Prerequisites)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 1. 프로젝트 경로 (중요)
+* **빌드 오류 방지**: Windows 환경에서 Flutter 빌드 시 한글 경로 에러가 발생할 수 있습니다.
+* **권장 경로**: `C:\Mobile` (반드시 영문 경로 사용)
+
+### 2. 기기 연결
+* 스마트폰의 **USB 디버깅** 모드 활성화
+* PC와 USB 케이블로 연결된 상태 확인
+
+---
+
+## 🚀 실행 가이드 (Execution Guide)
+[cite_start]PC를 켤 때마다 아래 순서대로 실행해야 데이터가 정상적으로 연동됩니다. [cite: 7]
+
+### **1. 데이터 생성 및 서버 가동**
+* [cite_start]**C# 프로그램**: `UPM_Decode`를 실행하여 데이터 송신 상태로 만듭니다. [cite: 9]
+* [cite_start]**Python 서버**: 터미널에서 프로젝트 루트(`C:\Mobile`)로 이동 후 아래 명령어를 입력합니다. [cite: 4, 11]
+    ```bash
+    python main.py
+    ```
+    * [cite_start]`Running on http://0.0.0.0:8000` 문구가 뜨는지 확인하세요. [cite: 13]
+
+### **2. 외부 터널링 실행 (ngrok)**
+* [cite_start]별도의 CMD 창을 열고 아래 명령어를 입력합니다. [cite: 15]
+    ```bash
+    ngrok http 8000
+    ```
+    * [cite_start]실행 후 **Forwarding** 항목에 뜨는 `https://...ngrok-free.app` 주소를 복사합니다. [cite: 17]
+
+### **3. 앱 코드 수정 (주소 업데이트)**
+* [cite_start]`lib/main.dart` (혹은 관련 파일)를 열고 주소를 최신화합니다. [cite: 18, 19]
+    ```dart
+    // 기존 주소를 지우고 복사한 ngrok 주소를 넣습니다.
+    [cite_start]final url = Uri.parse('https://[복사한-주소]/status'); [cite: 20]
+    ```
+    * ⚠️ **중요**: 수정 후 반드시 **Ctrl + S**를 눌러 저장하세요. [cite: 21]
+
+### **4. 모바일 앱 실행**
+* [cite_start]스마트폰을 USB로 연결(USB 디버깅 허용)한 뒤 터미널에 입력합니다. [cite: 23]
+    ```bash
+    flutter run
+    [cite_start]
+http://googleusercontent.com/immersive_entry_chip/0
