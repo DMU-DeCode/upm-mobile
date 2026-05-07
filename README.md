@@ -56,4 +56,4 @@ PC를 켤 때마다 아래 순서대로 실행해야 데이터가 정상적으�
     ```bash
     flutter run
     
-http://googleusercontent.com/immersive_entry_chip/0
+
