@@ -41,7 +41,7 @@ PC를 켤 때마다 아래 순서대로 실행해야 데이터가 정상적으�
     ```bash
     ngrok http 8000
     ```
-    * 실행 후 **Forwarding** 항목에 뜨는 `https://...ngrok-free.app` 주소를 복사합니다. 
+    * 실행 후 **Forwarding** 항목에 뜨는 `https://...ngrok-free.dev` 주소를 복사합니다. 
 
 ### **3. 앱 코드 수정 (주소 업데이트)**
 * `lib/main.dart` (혹은 관련 파일)를 열고 주소를 최신화합니다. 
