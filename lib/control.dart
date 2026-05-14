@@ -1,46 +1,31 @@
-import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class ControlScreen extends StatelessWidget {
-  const ControlScreen({super.key});
+class ControlService {
+  // 서버 주소 (ngrok 주소 사용)
+  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
 
-  void _confirmShutdown(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("PC 종료 명령"),
-        content: const Text("대상 PC를 지금 종료하시겠습니까?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("취소")),
-          ElevatedButton(
-            onPressed: () {
-              // 여기에 shutdown API 호출 코드 작성
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("종료 실행"),
-          ),
-        ],
-      ),
-    );
-  }
+  // 시스템 최적화 명령 전송 함수
+  static Future<bool> optimizeSystem() async {
+    try {
+      final url = Uri.parse('$baseUrl/optimize'); // 서버에 작성한 최적화 API 경로
+      
+      // 서버로 최적화 신호 보냄
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+      ).timeout(const Duration(seconds: 5));
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Remote Control")),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.power_settings_new, size: 80, color: Colors.red),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => _confirmShutdown(context),
-              child: const Text("Power Off PC"),
-            ),
-          ],
-        ),
-      ),
-    );
+      if (response.statusCode == 200) {
+        print("Optimization Success");
+        return true;
+      } else {
+        print("Server Error: ${response.statusCode}");
+        return false;
+      }
+    } catch (e) {
+      print("Connection Failed: $e");
+      return false;
+    }
   }
 }
