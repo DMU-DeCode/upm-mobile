@@ -28,4 +28,26 @@ class ControlService {
       return false;
     }
   }
+
+  // PC 전원 끄기 명령 전송 함수
+  static Future<bool> shutdownSystem() async {
+    try {
+      final url = Uri.parse('$baseUrl/shutdown');
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print("Shutdown Success");
+        return true;
+      } else {
+        print("Server Error: ${response.statusCode}");
+        return false;
+      }
+    } catch (e) {
+      print("Connection Failed: $e");
+      return false;
+    }
+  }
 }

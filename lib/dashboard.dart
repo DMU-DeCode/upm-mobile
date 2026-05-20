@@ -22,9 +22,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _ram = 0.0;
   double _gpu = 0.0;
   double _gpuTemp = 0.0;
+  double _ramUsed = 0.0;
+  double _ramTotal = 0.0;
   Timer? _timer;
   List<FlSpot> _cpuChartSpots = [];
   final int _maxX = 60;
+  bool _showCpuChart = false;
 
   @override
   void initState() {
@@ -46,20 +49,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _ram = (data['ram'] ?? 0.0).toDouble();
           _gpu = (data['gpu'] ?? 0.0).toDouble();
           _gpuTemp = (data['gpu_temp'] ?? 0.0).toDouble();
+          _ramUsed = (data['ram_used'] ?? 0.0).toDouble();
+          _ramTotal = (data['ram_total'] ?? 0.0).toDouble();
 
-          // 🚀 [여기서부터 추가] 실시간 그래프 데이터 누적 로직
-          // 1. 현재 CPU 값을 그래프 점(FlSpot)으로 만들어 리스트 끝에 추가합니다.
-          _cpuChartSpots.add(FlSpot(_cpuChartSpots.length.toDouble(), _cpu));
-
-          // 2. 만약 데이터가 너무 많아지면(예: 60개 초과), 맨 왼쪽(가장 오래된) 데이터를 버립니다.
-          if (_cpuChartSpots.length > _maxX) {
-            _cpuChartSpots.removeAt(0);
-            
-            // 3. 데이터가 왼쪽으로 밀려나는 효과를 주기 위해 X축 좌표를 0부터 다시 정렬합니다.
-            _cpuChartSpots = _cpuChartSpots.asMap().entries.map((entry) {
-              return FlSpot(entry.key.toDouble(), entry.value.y);
-            }).toList();
-          }
+          // 기존 점들을 1초씩 과거로 밀고 (x-1), 새 데이터를 x=0(Now)에 추가
+          _cpuChartSpots = _cpuChartSpots.map((s) => FlSpot(s.x - 1, s.y)).toList();
+          _cpuChartSpots.add(FlSpot(0, _cpu));
+          // -_maxX보다 오래된 점 제거
+          _cpuChartSpots.removeWhere((s) => s.x < -_maxX);
         });
       }
     } catch (e) {
@@ -109,7 +106,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           children: [
             // 1. 실시간 모니터 카드 (기존 유지)
@@ -126,184 +124,279 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeatGauge("CPU", _cpu),
-                      _buildHeatGauge("메모리", _ram),
-                      _buildHeatGauge("GPU", _gpu, temp: _gpuTemp),
+                      _buildHeatGauge("CPU 사용률", _cpu),
+                      _buildHeatGauge(
+                        "메모리 사용률", _ram,
+                        detail: _ramTotal > 0
+                            ? "${_ramUsed.toStringAsFixed(1)}GB / ${_ramTotal.toStringAsFixed(0)}GB"
+                            : null,
+                      ),
+                      _buildHeatGauge("GPU 사용률", _gpu, temp: _gpuTemp),
                     ],
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16), // 카드 사이 간격
+            const SizedBox(height: 16),
 
-            // 2. 빠른 최적화 버튼 (control.dart 로직 연결 예정)
-            SizedBox(
+            // 2. CPU 사용량 추이 그래프 카드 (토글)
+            Container(
               width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                    // 1. 최적화 함수 실행
-                    bool success = await ControlService.optimizeSystem();
-
-                    // 2. 결과 알림창(SnackBar) 표시
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("🚀 시스템 최적화가 완료되었습니다!"),
-                          backgroundColor: Colors.green,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () => setState(() => _showCpuChart = !_showCpuChart),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("CPU 사용량 추이 (실시간)",
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        Icon(
+                          _showCpuChart ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: Colors.white70,
                         ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("❌ 최적화 요청에 실패했습니다."),
-                          backgroundColor: Colors.red,
+                      ],
+                    ),
+                  ),
+                  if (_showCpuChart) ...[
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 200,
+                      child: LineChart(
+                        LineChartData(
+                          minY: 0,
+                          maxY: 100,
+                          minX: -_maxX.toDouble(),
+                          maxX: 0,
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: 25,
+                            getDrawingHorizontalLine: (value) {
+                              return const FlLine(color: Colors.white10, strokeWidth: 1);
+                            },
+                          ),
+                          titlesData: FlTitlesData(
+                            show: true,
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 22,
+                                interval: 15,
+                                getTitlesWidget: (double value, TitleMeta meta) {
+                                  const labels = <int, String>{
+                                    -60: '-60s',
+                                    -45: '-45s',
+                                    -30: '-30s',
+                                    -15: '-15s',
+                                    0: 'Now',
+                                  };
+                                  final label = labels[value.round()];
+                                  if (label == null) return const SizedBox.shrink();
+                                  return Text(
+                                    label,
+                                    style: const TextStyle(color: Colors.white30, fontSize: 9),
+                                  );
+                                },
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 28,
+                                interval: 25,
+                                getTitlesWidget: (double value, TitleMeta meta) {
+                                  return Text(
+                                    "${value.round()}",
+                                    style: const TextStyle(color: Colors.white30, fontSize: 10),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          lineTouchData: const LineTouchData(enabled: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _cpuChartSpots,
+                              isCurved: true,
+                              curveSmoothness: 0.15,
+                              color: const Color(0xFF34C759),
+                              barWidth: 2,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: const Color(0xFF34C759).withValues(alpha: 0.1),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    }
-                  },
-                icon: const Icon(Icons.speed, color: Colors.black),
-                label: const Text("빠른 최적화 실행", 
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF34C759), // 강조용 초록색
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.linear,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 3. 과거 사용량 추이 그래프 카드 (usage.dart 데이터 연결 수정)
-            // 🚀 [수정] 윈도우 작업관리자 스타일의 부드러운 실시간 그래프 카드
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E), // 기존 PC 카드색 유지
-                    borderRadius: BorderRadius.circular(12),
+            // 3. 빠른 제어 카드
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("빠른 제어",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        bool success = await ControlService.optimizeSystem();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(success ? "🚀 시스템 최적화가 완료되었습니다!" : "❌ 최적화 요청에 실패했습니다."),
+                              backgroundColor: success ? Colors.green : Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.speed),
+                      label: const Text("빠른 최적화",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF34C759),
+                        side: const BorderSide(color: Color(0xFF34C759), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("CPU 사용량 추이 (실시간)", 
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      
-                      // 그래프 영역
-                      SizedBox(
-                        height: 200,
-                        child: LineChart(
-                          LineChartData(
-                            minY: 0,
-                            maxY: 100,
-                            maxX: _maxX.toDouble(),
-                            minX: 0,
-                            gridData: FlGridData(
-                              show: true,
-                              drawVerticalLine: false, // 세로선 제거
-                              horizontalInterval: 25, // 25% 단위로 가로선
-                              // 🚀 [수정] value 외에 하나가 더 필요하거나 구조가 바뀐 버전을 대응합니다.
-                              getDrawingHorizontalLine: (value) {
-                                return const FlLine(color: Colors.white10, strokeWidth: 1);
-                              },
-                            ),
-                            titlesData: FlTitlesData(
-                              show: true,
-                              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                              bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)), // 아래 시간축 제거
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 28,
-                                  // 🚀 [수정] 최신 fl_chart는 (value, meta)가 아니라 (value, titleMeta) 구조이거나 가끔 명시적 타입이 필요합니다.
-                                  getTitlesWidget: (double value, TitleMeta meta) {
-                                    return Text(
-                                      "${value.toInt()}", 
-                                      style: const TextStyle(color: Colors.white30, fontSize: 10),
-                                    );
-                                  },
-                                ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: const Color(0xFF1E1E1E),
+                            title: const Text("전원 끄기", style: TextStyle(color: Colors.white)),
+                            content: const Text("PC를 종료하시겠습니까?", style: TextStyle(color: Colors.white70)),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text("취소", style: TextStyle(color: Colors.white70)),
                               ),
-                            ),
-                            borderData: FlBorderData(show: false), // 테두리 제거
-                            lineTouchData: const LineTouchData(enabled: false), // 터치 Interaction 끄기
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: _cpuChartSpots,
-                                isCurved: true, // 🚀 곡선 활성화 (부드러운 움직임의 핵심)
-                                curveSmoothness: 0.15, // 곡선의 부드러운 정도 조정 (0~1)
-                                color: const Color(0xFF34C759), // 게이지와 같은 초록색
-                                barWidth: 2,
-                                dotData: const FlDotData(show: false), // 점 숨기기
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  color: const Color(0xFF34C759).withOpacity(0.1), // 하단 음영
-                                ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text("종료", style: TextStyle(color: Color(0xFFFF453A))),
                               ),
                             ],
                           ),
-                          // [팁] 실시간 업데이트 시 차트 전체가 깜빡이는 것을 방지하기 위해 사용
-                          duration: const Duration(milliseconds: 250), // 애니메이션 지속 시간
-                          curve: Curves.linear, // 일정한 속도로 움직이도록 설정
-                        ),
+                        );
+                        if (confirm == true) {
+                          final success = await ControlService.shutdownSystem();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success ? "PC를 종료합니다." : "❌ 전원 끄기 요청에 실패했습니다."),
+                                backgroundColor: success ? const Color(0xFFFF453A) : Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.power_settings_new),
+                      label: const Text("전원 끄기",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF453A),
+                        side: const BorderSide(color: Color(0xFFFF453A), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
               ],
             ),
       ),
     );
   }
 
-Widget _buildHeatGauge(String label, double value, {double? temp}) {
-    // [수정] 이제 단일 색상을 전달하지 않고, Painter 내부에서 계산합니다.
+Widget _buildHeatGauge(String label, double value, {double? temp, String? detail}) {
     return Column(
       children: [
         Stack(
           alignment: Alignment.center,
           children: [
             SizedBox(
-              width: 85,
-              height: 85,
+              width: 72,
+              height: 72,
               child: CustomPaint(
                 painter: GaugePainter(
                   percent: value / 100,
-                  trackColor: const Color(0xFF4C4E56), // PC 배경 회색 
+                  trackColor: const Color(0xFF4C4E56),
                 ),
               ),
             ),
             Column(
               children: [
                 Text("${value.toInt()}%",
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                 if (temp != null)
-                  Text("${temp.toInt()}°C",
-                      style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  Text(
+                    temp < 1.0 ? "N/A" : "${temp.toInt()}°C",
+                    style: const TextStyle(color: Colors.white54, fontSize: 9),
+                  ),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // [수정] 현재 수치에 맞는 색상을 점에 표시
             Container(
-              width: 8, height: 8, 
-              decoration: BoxDecoration(color: getUsageHeatColor(value), shape: BoxShape.circle)
+              width: 6, height: 6,
+              decoration: BoxDecoration(color: getUsageHeatColor(value), shape: BoxShape.circle),
             ),
-            const SizedBox(width: 5),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
           ],
         ),
-      ],
-    );
-  }
+      const SizedBox(height: 3),
+      Text(
+        detail ?? "",
+        style: const TextStyle(color: Colors.white38, fontSize: 9),
+      ),
+    ],
+  );
+}
 }
 
 class GaugePainter extends CustomPainter {
