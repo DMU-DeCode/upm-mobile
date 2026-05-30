@@ -10,10 +10,11 @@
 <br/>
 
 ![Flutter](https://img.shields.io/badge/Flutter-v3.41.9-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.11.5-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![Provider](https://img.shields.io/badge/State-Provider-7B61FF?style=for-the-badge&logo=flutter&logoColor=white)
-![REST API](https://img.shields.io/badge/Network-REST%20API-FF6C37?style=for-the-badge&logo=postman&logoColor=white)
-![WebSocket](https://img.shields.io/badge/Realtime-WebSocket%20%2F%20Polling-009688?style=for-the-badge&logo=socket.io&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-^3.11.5-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![StatefulWidget](https://img.shields.io/badge/State-StatefulWidget-7B61FF?style=for-the-badge&logo=flutter&logoColor=white)
+![http](https://img.shields.io/badge/http-^1.1.0-FF6C37?style=for-the-badge&logo=postman&logoColor=white)
+![fl_chart](https://img.shields.io/badge/fl__chart-^1.2.0-009688?style=for-the-badge&logo=chartdotjs&logoColor=white)
+![Polling](https://img.shields.io/badge/Realtime-HTTP%20Polling%201s-blue?style=for-the-badge&logo=clockify&logoColor=white)
 ![ngrok](https://img.shields.io/badge/Tunnel-ngrok-1F1E37?style=for-the-badge&logo=ngrok&logoColor=white)
 
 </div>
@@ -44,8 +45,8 @@
 | 기존 방식의 한계 | 본 앱의 해결책 |
 |:-:|:-:|
 | PC 앞에 직접 앉아야만 상태 확인 가능 | 📱 스마트폰으로 **언제 어디서나** 실시간 확인 |
-| 문제 발생 시 뒤늦게 발견 | 🔔 이상 감지 시 **즉각 모니터링** 가능 |
-| 수동으로 프로그램 종료 및 정리 필요 | ⚙️ 앱에서 바로 **원격 최적화 명령** 전송 |
+| 문제 발생 시 뒤늦게 발견 | 🌡️ CPU / GPU / 메모리 **1초 단위** 실시간 모니터링 |
+| 수동으로 프로그램 종료 및 정리 필요 | ⚙️ 앱에서 버튼 하나로 **원격 최적화 명령** 전송 |
 | 사내망 전용 솔루션 | 🌐 **ngrok 터널**을 통한 외부 네트워크 접근 지원 |
 
 ### 🗂️ 전체 프로젝트 레포지토리 구성
@@ -54,8 +55,8 @@
 
 | 레포지토리 | 담당 파트 | 기술 |
 |:---:|:---:|:---:|
-| `Server` | 백엔드 API 서버 | Python (Flask / FastAPI) |
-| `Mobile` | 모바일 클라이언트 | Flutter / Dart |
+| `Server` | 백엔드 API 서버 | Python |
+| `Mobile` | 모바일 클라이언트 ← **현재 레포** | Flutter / Dart |
 | `Decode` | 데스크탑 에이전트 | C# (.NET) |
 
 ---
@@ -75,13 +76,10 @@
   │   에이전트  │  (localhost) │  (REST API) │   HTTPS 통신   │  (Mobile)   │
   │            │              │             │                │             │
   │ · CPU 사용률│              │ · 데이터 수집│                │ · 대시보드  │
-  │ · 메모리    │              │ · 데이터 저장│                │ · 실시간 차트│
-  │ · GPU 온도 │              │ · API 응답  │                │ · 원격 제어 │
-  │ · 디스크    │              │ · 명령 수신  │                │ · 알림 수신 │
+  │ · 메모리    │              │ · 데이터 저장│                │ · 실시간 게이지│
+  │ · GPU 온도 │              │ · API 응답  │                │ · CPU 차트  │
+  │ · 디스크    │              │ · 명령 수신  │                │ · 원격 제어 │
   └────────────┘              └─────────────┘                └─────────────┘
-         │                           ▲                               │
-         │      하드웨어 데이터 수집   │      HTTP/WebSocket 요청      │
-         └───────────────────────────┘───────────────────────────────┘
 ```
 
 ### 📡 통신 레이어 상세
@@ -89,17 +87,16 @@
 ```
 Flutter App (Mobile)
        │
-       │  HTTPS Request (REST API)
-       │  WebSocket / Polling (실시간)
+       │  HTTPS — HTTP Polling (1초 주기 Timer.periodic)
        ▼
   ngrok Public URL
-  (https://xxxx-xx-xx.ngrok.io)
+  (https://xxxx.ngrok-free.dev)
        │
-       │  터널링 (TCP Forwarding)
+       │  TCP 터널링
        ▼
   Python Server (localhost:PORT)
        │
-       │  내부 소켓 / HTTP
+       │  내부 IPC / Socket
        ▼
   C# Desktop Agent
   (하드웨어 데이터 수집 및 명령 실행)
@@ -111,82 +108,87 @@ Flutter App (Mobile)
 
 ### 📊 실시간 하드웨어 모니터링
 
-앱은 Python 서버의 REST API 또는 WebSocket을 통해 아래 하드웨어 데이터를 **실시간**으로 수신하고 시각화합니다.
+앱은 Python 서버의 `/status` 엔드포인트를 **1초마다 자동 호출**하여 아래 하드웨어 데이터를 실시간으로 수신하고 시각화합니다.
 
-| 모니터링 항목 | 표시 방식 | 갱신 주기 |
-|:---:|:---:|:---:|
-| 🖥️ CPU 사용률 (%) | 원형 게이지 + 꺾은선 그래프 | 실시간 (Polling / WS) |
-| 🧠 메모리 사용량 (GB / %) | 막대 그래프 + 수치 표시 | 실시간 |
-| 🎮 GPU 사용률 (%) | 카드 위젯 + 진행 바 | 실시간 |
-| 🌡️ CPU / GPU 온도 (°C) | 온도 게이지 (색상 경고 포함) | 실시간 |
-| 💾 디스크 사용량 | 도넛 차트 | 주기적 갱신 |
-| 🌐 네트워크 I/O | 수치 표시 | 실시간 |
+| 모니터링 항목 | JSON 키 | 표시 방식 | 갱신 주기 |
+|:---:|:---:|:---:|:---:|
+| 🖥️ CPU 사용률 (%) | `cpu` | 원형 게이지 + 꺾은선 그래프 | **1초** |
+| 🧠 메모리 사용률 (%) | `ram` | 원형 게이지 | **1초** |
+| 🧠 메모리 사용량 (GB) | `ram_used` / `ram_total` | 게이지 하단 수치 표시 | **1초** |
+| 🎮 GPU 사용률 (%) | `gpu` | 원형 게이지 | **1초** |
+| 🌡️ GPU 온도 (°C) | `gpu_temp` | 게이지 중앙 수치 (N/A 처리 포함) | **1초** |
 
-### ⚙️ 원격 PC 최적화 및 제어
+### 📈 CPU 사용량 추이 그래프
 
-사용자는 앱에서 직접 PC에 최적화 명령을 전송할 수 있습니다.
+- 최근 **60초** 분량의 CPU 사용률을 꺾은선 그래프로 시각화
+- 카드 헤더 탭으로 **토글(열기/닫기)** 가능
+- `fl_chart`의 `LineChart` 사용, x축은 `-60s ~ Now`, y축은 `0 ~ 100%`
+
+### ⚙️ 원격 PC 제어
+
+앱의 "빠른 제어" 카드에서 버튼 하나로 PC에 명령을 전송할 수 있습니다.
+
+| 버튼 | API | 동작 |
+|:---:|:---:|:---|
+| 🚀 빠른 최적화 | `POST /optimize` | 서버를 통해 PC 메모리 및 시스템 최적화 실행 |
+| 🔴 전원 끄기 | `POST /shutdown` | 확인 다이얼로그 후 PC 원격 종료 명령 전송 |
+
+### 🌡️ 색상 경고 시스템 (Heat Color)
+
+C# Desktop 에이전트의 색상 보간 로직을 Dart로 이식한 `getUsageHeatColor()` 함수를 통해,  
+사용률에 따라 게이지 색상이 자동으로 변합니다.
 
 ```
-[앱 내 제어 기능]
-
-  ┌─────────────────────────────────┐
-  │  🧹 메모리 최적화 실행           │  ← 불필요한 프로세스 메모리 해제
-  │  ❌ 특정 프로세스 종료           │  ← 실행 중인 프로세스 목록 조회 후 종료
-  │  🔄 시스템 캐시 정리             │  ← 임시 파일 및 캐시 정리 명령
-  │  📋 실행 중 프로세스 목록 조회   │  ← 현재 프로세스 리스트 확인
-  └─────────────────────────────────┘
+  0% ──────── 25% ──────── 50% ──────── 75% ──── 100%
+  🟢 초록    🟡 노랑     🟠 주황     🔴 빨강
+ #34C759   #FFD60A    #FF9F0A    #FF453A
 ```
 
 ---
 
 ## 4. UI/UX 및 대시보드 구조
 
-### 🎨 화면 구성 (Screen Flow)
+### 🎨 화면 구성
+
+앱은 **단일 스크린(DashboardScreen)** 구조로, 스크롤 가능한 카드 레이아웃으로 구성됩니다.
 
 ```
-앱 실행
-  │
-  ▼
-┌─────────────────┐
-│   서버 연결 화면  │  ← ngrok URL 입력 및 연결 상태 확인
-└────────┬────────┘
-         │ 연결 성공
-         ▼
-┌─────────────────┐
-│  메인 대시보드   │  ← 핵심 하드웨어 상태 한눈에 요약
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌────────────┐
-│ 상세 모│ │  원격 제어  │
-│니터링  │ │   화면     │
-│화면    │ │            │
-│        │ │ · 프로세스  │
-│· CPU   │ │   목록     │
-│· Memory│ │ · 최적화   │
-│· GPU   │ │   명령     │
-│· Temp  │ │            │
-└────────┘ └────────────┘
+┌─────────────────────────────┐
+│       UPM MOBILE (AppBar)   │
+├─────────────────────────────┤
+│  📊 실시간 모니터             │  ← CPU / 메모리 / GPU 게이지 3개 나란히
+│  [CPU 72%] [RAM 58%] [GPU 45%│
+│                 GPU 온도: 61°C│
+├─────────────────────────────┤
+│  📈 CPU 사용량 추이 (실시간) ▼│  ← 탭하면 토글
+│  ┌───────────────────────┐  │
+│  │    꺾은선 그래프       │  │
+│  │  -60s ──────── Now    │  │
+│  └───────────────────────┘  │
+├─────────────────────────────┤
+│  ⚡ 빠른 제어                │
+│  [ 🚀 빠른 최적화 ]          │
+│  [ 🔴 전원 끄기   ]          │
+└─────────────────────────────┘
 ```
 
-### 🧩 주요 위젯 구성
+### 🧩 주요 위젯 및 클래스
 
-| 위젯명 | 역할 | 위치 |
-|:---:|:---:|:---:|
-| `ServerConnectWidget` | URL 입력 및 연결 관리 | 연결 화면 |
-| `HardwareSummaryCard` | 핵심 지표 카드 요약 | 메인 대시보드 |
-| `CpuGaugeWidget` | CPU 사용률 원형 게이지 | 상세 모니터링 |
-| `MemoryBarWidget` | 메모리 막대 그래프 | 상세 모니터링 |
-| `GpuTempWidget` | GPU 온도 및 사용률 카드 | 상세 모니터링 |
-| `ProcessListWidget` | 실행 중인 프로세스 목록 | 원격 제어 화면 |
-| `OptimizeButtonWidget` | 최적화 명령 전송 버튼 | 원격 제어 화면 |
+| 클래스 / 위젯 | 파일 | 역할 |
+|:---:|:---:|:---|
+| `DashboardScreen` | `dashboard.dart` | 앱의 메인(유일한) 화면, StatefulWidget |
+| `_buildHeatGauge()` | `dashboard.dart` | CPU / 메모리 / GPU 원형 게이지 빌더 |
+| `GaugePainter` | `dashboard.dart` | CustomPainter 기반 그라데이션 게이지 |
+| `getUsageHeatColor()` | `dashboard.dart` | 사용률 → 색상 보간 함수 |
+| `ControlService` | `control.dart` | 최적화 / 전원 끄기 HTTP 요청 서비스 |
+| `UsageService` | `usage.dart` | 과거 사용 이력 조회 서비스 |
 
 ### 🎨 디자인 원칙
 
-- **다크 테마 기반** UI로 하드웨어 모니터링 앱 특유의 전문적인 느낌 구현
-- **색상 경고 시스템**: 온도·사용률 수치에 따라 초록 → 노랑 → 빨강으로 색상 자동 변경
-- **반응형 레이아웃**: 다양한 스마트폰 해상도에 대응하는 유연한 위젯 배치
+- **다크 테마**: 배경 `#121212`, 카드 `#1E1E1E`
+- **색상 경고 시스템**: 사용률에 따라 초록 → 노랑 → 주황 → 빨강 자동 변경
+- **반응형 스크롤 레이아웃**: `SingleChildScrollView` 기반, 다양한 화면 크기 대응
+- **피드백**: 제어 명령 성공/실패 시 `SnackBar`로 즉각 안내
 
 ---
 
@@ -194,110 +196,89 @@ Flutter App (Mobile)
 
 ### 🌐 ngrok 터널 연동 메커니즘
 
-외부에서 로컬 Python 서버에 접근하기 위해 **ngrok** 터널 주소를 활용합니다.
+외부에서 로컬 Python 서버에 접근하기 위해 **ngrok** 터널 주소를 활용합니다.  
+현재 앱 내 `baseUrl`은 `control.dart` / `usage.dart`에 상수로 선언되어 있으며, ngrok 주소 변경 시 해당 값을 업데이트합니다.
 
 ```
-1. 사용자가 PC에서 Python 서버 실행
+1. PC에서 Python 서버 실행
    └─ python server.py  (예: localhost:8000)
 
-2. ngrok으로 외부 URL 생성
+2. ngrok으로 외부 HTTPS URL 생성
    └─ ngrok http 8000
-   └─ 결과: https://abcd-123-456.ngrok-free.app
+   └─ 결과: https://xxxx-xx-xx.ngrok-free.app
 
-3. 앱의 '서버 연결' 화면에 위 URL 입력
-   └─ 이후 모든 API 요청은 해당 URL 베이스로 전송
+3. control.dart / usage.dart 의 baseUrl 상수를 해당 URL로 변경
+   └─ static const String baseUrl = 'https://xxxx.ngrok-free.app';
+
+4. 앱 재빌드 또는 hot restart 후 사용
 ```
 
-### 📡 API 요청 구조
+### 🔄 실시간 데이터 수신 방식 — HTTP Polling
 
 ```dart
-// 예시: 하드웨어 데이터 요청
-final response = await http.get(
-  Uri.parse('$baseUrl/api/hardware/status'),
-  headers: {'Content-Type': 'application/json'},
-);
+// dashboard.dart — 1초마다 /status 호출
+_timer = Timer.periodic(const Duration(seconds: 1), (timer) => _fetchStatus());
 
-// 예시: 원격 최적화 명령 전송
-final response = await http.post(
-  Uri.parse('$baseUrl/api/control/optimize'),
-  body: jsonEncode({'action': 'memory_clean'}),
-);
+Future<void> _fetchStatus() async {
+  final response = await http.get(
+    Uri.parse('$baseUrl/status'),
+  ).timeout(const Duration(milliseconds: 800));
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    setState(() {
+      _cpu  = data['cpu'].toDouble();
+      _ram  = data['ram'].toDouble();
+      _gpu  = data['gpu'].toDouble();
+      // ...
+    });
+  }
+}
 ```
 
-### 🔄 실시간 데이터 수신 방식
+### 🗺️ API 엔드포인트 (실제 연동 목록)
 
+| 메서드 | 엔드포인트 | 파일 | 설명 |
+|:---:|:---|:---:|:---|
+| `GET` | `/status` | `dashboard.dart` | CPU / RAM / GPU 실시간 현황 |
+| `POST` | `/optimize` | `control.dart` | 시스템 최적화 명령 전송 |
+| `POST` | `/shutdown` | `control.dart` | PC 원격 종료 명령 전송 |
+| `GET` | `/api/v1/metrics/history` | `usage.dart` | 과거 하드웨어 사용 이력 조회 |
+
+### 📦 `/status` 응답 형식 예시
+
+```json
+{
+  "cpu": 45.2,
+  "ram": 61.0,
+  "ram_used": 9.8,
+  "ram_total": 16.0,
+  "gpu": 32.0,
+  "gpu_temp": 58.0
+}
 ```
-방식 1. Polling (주기적 HTTP 요청)
-  ┌─────────────────────────────────────────┐
-  │  Timer.periodic(Duration(seconds: 2))   │
-  │    └─ GET /api/hardware/status 요청      │
-  │    └─ 응답 데이터로 UI 상태 업데이트     │
-  └─────────────────────────────────────────┘
-
-방식 2. WebSocket (지속 연결 스트림)
-  ┌─────────────────────────────────────────┐
-  │  WebSocket.connect('ws://baseUrl/ws')   │
-  │    └─ 서버 푸시 데이터 실시간 수신      │
-  │    └─ StreamBuilder로 UI 자동 갱신      │
-  └─────────────────────────────────────────┘
-```
-
-### 🗺️ 주요 API 엔드포인트 (연동 목록)
-
-| 메서드 | 엔드포인트 | 설명 |
-|:---:|:---|:---|
-| `GET` | `/api/hardware/status` | 전체 하드웨어 현황 조회 |
-| `GET` | `/api/hardware/cpu` | CPU 사용률 및 온도 |
-| `GET` | `/api/hardware/memory` | 메모리 사용량 |
-| `GET` | `/api/hardware/gpu` | GPU 사용률 및 온도 |
-| `GET` | `/api/process/list` | 실행 중 프로세스 목록 |
-| `POST` | `/api/control/optimize` | 최적화 명령 전송 |
-| `POST` | `/api/process/kill` | 특정 프로세스 종료 |
-| `WS` | `/ws` | WebSocket 실시간 스트림 |
 
 ---
 
 ## 6. 디렉토리 구조
 
 ```
-mobile/
-├── android/                  # Android 네이티브 빌드 설정
-├── ios/                      # iOS 네이티브 빌드 설정
+UPM_Mobile/
+├── android/                   # Android 네이티브 빌드 설정
+├── ios/                       # iOS 네이티브 빌드 설정
 ├── lib/
-│   ├── main.dart             # 앱 엔트리포인트, Provider 초기화
-│   │
-│   ├── models/               # 데이터 모델 (JSON 직렬화)
-│   │   ├── hardware_status.dart
-│   │   ├── cpu_data.dart
-│   │   ├── memory_data.dart
-│   │   ├── gpu_data.dart
-│   │   └── process_info.dart
-│   │
-│   ├── services/             # 네트워크 통신 레이어
-│   │   ├── api_service.dart      # HTTP REST API 요청 처리
-│   │   ├── websocket_service.dart # WebSocket 연결 관리
-│   │   └── server_config.dart    # ngrok URL 설정 관리
-│   │
-│   ├── providers/            # 상태 관리 (Provider 패턴)
-│   │   ├── hardware_provider.dart
-│   │   ├── connection_provider.dart
-│   │   └── control_provider.dart
-│   │
-│   ├── screens/              # 화면 단위 UI
-│   │   ├── connect_screen.dart   # 서버 연결 화면
-│   │   ├── dashboard_screen.dart # 메인 대시보드
-│   │   ├── monitor_screen.dart   # 상세 모니터링
-│   │   └── control_screen.dart   # 원격 제어 화면
-│   │
-│   └── widgets/              # 재사용 가능한 UI 위젯
-│       ├── hardware_summary_card.dart
-│       ├── cpu_gauge_widget.dart
-│       ├── memory_bar_widget.dart
-│       ├── gpu_temp_widget.dart
-│       ├── process_list_widget.dart
-│       └── optimize_button_widget.dart
-│
-├── pubspec.yaml              # 패키지 의존성 정의
+│   ├── main.dart              # 앱 진입점 — MaterialApp, DashboardScreen 연결
+│   ├── dashboard.dart         # 메인 대시보드 화면
+│   │                          #   · 실시간 모니터 게이지 (CPU / RAM / GPU)
+│   │                          #   · CPU 추이 꺾은선 그래프 (토글)
+│   │                          #   · 빠른 제어 버튼 (최적화 / 전원 끄기)
+│   │                          #   · GaugePainter (CustomPainter)
+│   ├── control.dart           # 원격 제어 서비스
+│   │                          #   · ControlService.optimizeSystem()
+│   │                          #   · ControlService.shutdownSystem()
+│   └── usage.dart             # 과거 사용 이력 서비스
+│                              #   · UsageService.getUsageHistory()
+├── pubspec.yaml               # 패키지 의존성 정의
 └── README.md
 ```
 
@@ -307,20 +288,20 @@ mobile/
 
 ### ✅ 사전 요구사항
 
-| 항목 | 최소 버전 | 확인 명령어 |
+| 항목 | 버전 | 확인 명령어 |
 |:---:|:---:|:---:|
 | Flutter SDK | 3.41.9 이상 | `flutter --version` |
-| Dart SDK | 3.x 이상 | `dart --version` |
-| Android Studio / Xcode | 최신 권장 | — |
-| 연결된 기기 or 에뮬레이터 | — | `flutter devices` |
+| Dart SDK | ^3.11.5 | `dart --version` |
+| Android Studio / VS Code | 최신 권장 | — |
+| 연결된 기기 또는 에뮬레이터 | — | `flutter devices` |
 
 ### 🚀 설치 및 실행 순서
 
 **1단계 — 레포지토리 클론**
 
 ```bash
-git clone https://github.com/<Organization>/Mobile.git
-cd Mobile
+git clone https://github.com/DMU-DeCode/UPM_Mobile.git
+cd UPM_Mobile
 ```
 
 **2단계 — 패키지 의존성 설치**
@@ -329,17 +310,24 @@ cd Mobile
 flutter pub get
 ```
 
-**3단계 — 서버 측 준비 (선행 조건)**
+**3단계 — ngrok URL 설정**
 
-> 📌 Mobile 앱을 실행하기 전, **Server 레포지토리**의 Python 서버와 ngrok이 먼저 실행 중이어야 합니다.
+> 📌 앱 실행 전 **Server 레포지토리**의 Python 서버와 ngrok이 먼저 실행되어 있어야 합니다.
 
 ```bash
-# [Server 레포 - 별도 터미널]
+# [Server 레포 — 별도 터미널]
 python server.py
 
-# [ngrok 터널 생성 - 별도 터미널]
+# [ngrok 터널 생성 — 별도 터미널]
 ngrok http 8000
-# → 출력된 https://xxxx.ngrok-free.app URL을 복사해 앱에 입력
+# → 출력된 https://xxxx.ngrok-free.app 주소를 복사
+```
+
+이후 `lib/control.dart`와 `lib/usage.dart`의 `baseUrl` 상수를 복사한 주소로 변경합니다.
+
+```dart
+// control.dart, usage.dart 공통
+static const String baseUrl = 'https://your-ngrok-url.ngrok-free.app';
 ```
 
 **4단계 — 앱 실행**
@@ -354,7 +342,7 @@ flutter run
 # 특정 기기 지정 실행
 flutter run -d <device_id>
 
-# 릴리즈 모드 빌드 (성능 테스트용)
+# 릴리즈 모드 (성능 테스트용)
 flutter run --release
 ```
 
@@ -362,31 +350,33 @@ flutter run --release
 
 ```bash
 flutter build apk --release
-# 빌드 결과: build/app/outputs/flutter-apk/app-release.apk
+# 결과물: build/app/outputs/flutter-apk/app-release.apk
+```
+
+### 🔧 실제 패키지 의존성 (pubspec.yaml)
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8    # iOS 스타일 아이콘
+  http: ^1.1.0               # REST API HTTP 통신
+  fl_chart: ^1.2.0           # 꺾은선 그래프 (CPU 추이)
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
 ```
 
 ### 🧪 에뮬레이터 vs 실기기 테스트
 
 | 항목 | Android 에뮬레이터 | iOS 시뮬레이터 | 실기기 |
 |:---:|:---:|:---:|:---:|
-| 네트워크 접근 | ⚠️ 호스트 IP 설정 필요 | ⚠️ 동일 | ✅ 직접 접근 |
-| ngrok URL 연동 | ✅ 외부 URL이므로 바로 사용 | ✅ | ✅ |
-| 권장 여부 | 개발 초기 테스트 | iOS 확인용 | **최종 테스트 권장** |
+| ngrok URL 접근 | ✅ 외부 URL이므로 바로 사용 | ✅ | ✅ |
+| 실시간 성능 확인 | ⚠️ 에뮬레이터 특성상 제한 | ⚠️ | ✅ **최종 테스트 권장** |
 
-> 💡 **ngrok URL은 외부 HTTPS 주소**이므로 에뮬레이터에서도 별도 설정 없이 바로 연결 가능합니다.
-
-### 🔧 주요 패키지 (pubspec.yaml)
-
-```yaml
-dependencies:
-  flutter:
-    sdk: flutter
-  provider: ^6.x.x          # 상태 관리
-  http: ^1.x.x               # REST API 통신
-  web_socket_channel: ^2.x.x # WebSocket 통신
-  fl_chart: ^0.x.x           # 차트 및 그래프 위젯
-  shared_preferences: ^2.x.x # 서버 URL 로컬 저장
-```
+> 💡 **ngrok URL은 외부 HTTPS 주소**이므로 에뮬레이터에서도 별도 네트워크 설정 없이 바로 연결 가능합니다.
 
 ---
 
