@@ -10,11 +10,8 @@
 <br/>
 
 ![Flutter](https://img.shields.io/badge/Flutter-v3.41.9-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-^3.11.5-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![StatefulWidget](https://img.shields.io/badge/State-StatefulWidget-7B61FF?style=for-the-badge&logo=flutter&logoColor=white)
-![http](https://img.shields.io/badge/http-^1.1.0-FF6C37?style=for-the-badge&logo=postman&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-v3.11.5-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![fl_chart](https://img.shields.io/badge/fl__chart-^1.2.0-009688?style=for-the-badge&logo=chartdotjs&logoColor=white)
-![Polling](https://img.shields.io/badge/Realtime-HTTP%20Polling%201s-blue?style=for-the-badge&logo=clockify&logoColor=white)
 ![ngrok](https://img.shields.io/badge/Tunnel-ngrok-1F1E37?style=for-the-badge&logo=ngrok&logoColor=white)
 
 </div>
@@ -28,8 +25,7 @@
 3. [모바일 앱의 역할 (기능 상세)](#3-모바일-앱의-역할-기능-상세)
 4. [UI/UX 및 대시보드 구조](#4-uiux-및-대시보드-구조)
 5. [서버 및 API 연동 방식](#5-서버-및-api-연동-방식)
-6. [디렉토리 구조](#6-디렉토리-구조)
-7. [설치 및 실행 방법](#7-설치-및-실행-방법)
+6. [설치 및 실행 방법](#6-설치-및-실행-방법)
 
 ---
 
@@ -85,26 +81,33 @@
 ### 📡 통신 레이어 상세
 
 ```
-Flutter App (Mobile)
+
+C# Desktop Agent
        │
-       │  HTTPS — HTTP Polling (1초 주기 Timer.periodic)
+       │  HTTP POST /api/v1/metrics (주기적 PUSH)
        ▼
-  ngrok Public URL
-  (https://xxxx.ngrok-free.dev)
+  Python Server (FastAPI)
        │
-       │  TCP 터널링
+       │  MySQL에 저장
        ▼
-  Python Server (localhost:PORT)
+  MySQL DB
        │
-       │  내부 IPC / Socket
+       │  GET /status → 최신 행 조회
        ▼
-  C# Desktop Agent
-  (하드웨어 데이터 수집 및 명령 실행)
+  Python Server (FastAPI)
+       │
+       │  ngrok 터널링 (HTTPS)
+       ▼
+  Flutter App (Mobile)
+       │
+       │  HTTP Polling (1초, Timer.periodic)
+       └─ GET /status 반복 요청
+
 ```
 
 ---
 
-## 3. 모바일 앱의 역할 (기능 상세)
+## 3. 모바일 앱의 역할
 
 ### 📊 실시간 하드웨어 모니터링
 
@@ -153,23 +156,7 @@ C# Desktop 에이전트의 색상 보간 로직을 Dart로 이식한 `getUsageHe
 앱은 **단일 스크린(DashboardScreen)** 구조로, 스크롤 가능한 카드 레이아웃으로 구성됩니다.
 
 ```
-┌─────────────────────────────┐
-│       UPM MOBILE (AppBar)   │
-├─────────────────────────────┤
-│  📊 실시간 모니터            │  ← CPU / 메모리 / GPU 게이지 3개 나란히
-│  [CPU 72%] [RAM 58%] [GPU 45%│
-│                 GPU 온도: 61°C│
-├─────────────────────────────┤
-│  📈 CPU 사용량 추이 (실시간) ▼│  ← 탭하면 토글
-│  ┌───────────────────────┐  │
-│  │    꺾은선 그래프       │  │
-│  │  -60s ──────── Now    │  │
-│  └───────────────────────┘  │
-├─────────────────────────────┤
-│  ⚡ 빠른 제어                │
-│  [ 🚀 빠른 최적화 ]          │
-│  [ 🔴 전원 끄기   ]          │
-└─────────────────────────────┘
+
 ```
 
 ### 🧩 주요 위젯 및 클래스
@@ -260,31 +247,7 @@ Future<void> _fetchStatus() async {
 
 ---
 
-## 6. 디렉토리 구조
-
-```
-UPM_Mobile/
-├── android/                   # Android 네이티브 빌드 설정
-├── ios/                       # iOS 네이티브 빌드 설정
-├── lib/
-│   ├── main.dart              # 앱 진입점 — MaterialApp, DashboardScreen 연결
-│   ├── dashboard.dart         # 메인 대시보드 화면
-│   │                          #   · 실시간 모니터 게이지 (CPU / RAM / GPU)
-│   │                          #   · CPU 추이 꺾은선 그래프 (토글)
-│   │                          #   · 빠른 제어 버튼 (최적화 / 전원 끄기)
-│   │                          #   · GaugePainter (CustomPainter)
-│   ├── control.dart           # 원격 제어 서비스
-│   │                          #   · ControlService.optimizeSystem()
-│   │                          #   · ControlService.shutdownSystem()
-│   └── usage.dart             # 과거 사용 이력 서비스
-│                              #   · UsageService.getUsageHistory()
-├── pubspec.yaml               # 패키지 의존성 정의
-└── README.md
-```
-
----
-
-## 7. 설치 및 실행 방법
+## 6. 설치 및 실행 방법
 
 ### ✅ 사전 요구사항
 
@@ -320,14 +283,14 @@ python server.py
 
 # [ngrok 터널 생성 — 별도 터미널]
 ngrok http 8000
-# → 출력된 https://xxxx.ngrok-free.app 주소를 복사
+# → 출력된 https://xxxx.ngrok-free.dev 주소를 복사
 ```
 
 이후 `lib/control.dart`와 `lib/usage.dart`의 `baseUrl` 상수를 복사한 주소로 변경합니다.
 
 ```dart
 // control.dart, usage.dart 공통
-static const String baseUrl = 'https://your-ngrok-url.ngrok-free.app';
+static const String baseUrl = 'https://your-ngrok-url.ngrok-free.dev';
 ```
 
 **4단계 — 앱 실행**
@@ -388,7 +351,7 @@ dev_dependencies:
 |:---:|:---:|
 | 학교 | 동양미래대학교 |
 | 학과 | 컴퓨터소프트웨어공학과 |
-| 구분 | 졸업작품 (2025) |
+| 구분 | 졸업작품 (2026) |
 | 담당 파트 | 모바일 앱 개발 (Flutter) |
 
 <br/>
