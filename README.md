@@ -55,7 +55,7 @@
 | 레포지토리 | 담당 파트 | 기술 |
 |:---:|:---:|:---:|
 | `Server` | 백엔드 API 서버 | Python (Flask / FastAPI) |
-| `Mobile` | 모바일 클라이언트 ← **현재 레포** | Flutter / Dart |
+| `Mobile` | 모바일 클라이언트 | Flutter / Dart |
 | `Decode` | 데스크탑 에이전트 | C# (.NET) |
 
 ---
