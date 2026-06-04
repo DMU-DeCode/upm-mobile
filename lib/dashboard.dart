@@ -39,7 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _fetchStatus() async {
     try {
-      final url = Uri.parse('https://powdering-carry-uneasy.ngrok-free.dev/status');
+      final url = Uri.parse('https://untangled-detached-balsamic.ngrok-free.dev/status');
       final response = await http.get(url).timeout(const Duration(milliseconds: 800));
 
       if (response.statusCode == 200) {
