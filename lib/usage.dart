@@ -2,7 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class UsageService {
-  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
+  static const String baseUrl = 'https://untangled-detached-balsamic.ngrok-free.dev';
 
   // 과거 데이터 내역을 가져오는 함수
   static Future<List<Map<String, dynamic>>> getUsageHistory() async {
