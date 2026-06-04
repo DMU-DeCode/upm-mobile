@@ -3,7 +3,7 @@ import 'dart:convert';
 
 class ControlService {
   // 서버 주소 (ngrok 주소 사용)
-  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
+  static const String baseUrl = 'https://untangled-detached-balsamic.ngrok-free.dev';
 
   // 시스템 최적화 명령 전송 함수
   static Future<bool> optimizeSystem() async {
