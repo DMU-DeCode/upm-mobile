@@ -39,7 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _fetchStatus() async {
     try {
-      final url = Uri.parse('https://untangled-detached-balsamic.ngrok-free.dev/status');
+      final url = Uri.parse('https://powdering-carry-uneasy.ngrok-free.dev/status');
       final response = await http.get(url).timeout(const Duration(milliseconds: 800));
 
       if (response.statusCode == 200) {
@@ -334,6 +334,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFFF453A),
                         side: const BorderSide(color: Color(0xFFFF453A), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: const Color(0xFF1E1E1E),
+                            title: const Text("PC 재시작", style: TextStyle(color: Colors.white)),
+                            content: const Text("PC를 재시작하시겠습니까?", style: TextStyle(color: Colors.white70)),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text("취소", style: TextStyle(color: Colors.white70)),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text("재시작", style: TextStyle(color: Color(0xFFFF9F0A))),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          final success = await ControlService.restartSystem();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success ? "PC를 재시작합니다." : "❌ 재시작 요청에 실패했습니다."),
+                                backgroundColor: success ? const Color(0xFFFF9F0A) : Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.restart_alt),
+                      label: const Text("PC 재시작",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF9F0A),
+                        side: const BorderSide(color: Color(0xFFFF9F0A), width: 1.5),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
