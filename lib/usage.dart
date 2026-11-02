@@ -1,8 +1,13 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import 'config.dart';
+
 class UsageService {
-  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
+  // 서버 주소는 config.dart 한 곳에서 관리합니다.
+  static const String baseUrl = AppConfig.baseUrl;
 
   // 과거 데이터 내역을 가져오는 함수
   static Future<List<Map<String, dynamic>>> getUsageHistory() async {
@@ -17,7 +22,7 @@ class UsageService {
       }
       return [];
     } catch (e) {
-      print("History Fetch Failed: $e");
+      debugPrint("History Fetch Failed: $e");
       return [];
     }
   }

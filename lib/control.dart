@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import 'config.dart';
 
 class ControlService {
-  // 서버 주소 (ngrok 주소 사용)
-  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
+  // 서버 주소는 config.dart 한 곳에서 관리합니다.
+  static const String baseUrl = AppConfig.baseUrl;
 
   // 시스템 최적화 명령 전송 함수
   static Future<bool> optimizeSystem() async {
@@ -17,14 +19,14 @@ class ControlService {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        print("Optimization Success");
+        debugPrint("Optimization Success");
         return true;
       } else {
-        print("Server Error: ${response.statusCode}");
+        debugPrint("Server Error: ${response.statusCode}");
         return false;
       }
     } catch (e) {
-      print("Connection Failed: $e");
+      debugPrint("Connection Failed: $e");
       return false;
     }
   }
@@ -42,14 +44,14 @@ class ControlService {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        print("Shutdown Success");
+        debugPrint("Shutdown Success");
         return true;
       } else {
-        print("Server Error: ${response.statusCode}");
+        debugPrint("Server Error: ${response.statusCode}");
         return false;
       }
     } catch (e) {
-      print("Connection Failed: $e");
+      debugPrint("Connection Failed: $e");
       return false;
     }
   }
@@ -67,14 +69,14 @@ class ControlService {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        print("Restart Success");
+        debugPrint("Restart Success");
         return true;
       } else {
-        print("Server Error: ${response.statusCode}");
+        debugPrint("Server Error: ${response.statusCode}");
         return false;
       }
     } catch (e) {
-      print("Connection Failed: $e");
+      debugPrint("Connection Failed: $e");
       return false;
     }
   }

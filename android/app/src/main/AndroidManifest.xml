@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 서버(ngrok)와 통신하려면 필요합니다. 이 줄이 없으면 release APK 에서 네트워크 요청이 모두 실패합니다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="upm_app"
         android:name="${applicationName}"
