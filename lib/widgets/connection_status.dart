@@ -27,13 +27,28 @@ Color linkStatusColor(LinkStatus status) {
 ///
 /// 상태가 바뀌면 점 색과 문구가 부드럽게 바뀝니다.
 class ConnectionStatusBadge extends StatelessWidget {
-  const ConnectionStatusBadge({super.key, required this.status});
+  const ConnectionStatusBadge({super.key, required this.status, this.chip = false, this.fontSize = 13});
 
   final LinkStatus status;
+
+  /// true 면 옅은 색 배경의 둥근 알약 모양으로 그립니다 (예: 설정 화면 "● 연결됨").
+  final bool chip;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
     final Color color = linkStatusColor(status);
+    if (chip) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: ConnectionStatusBadge(status: status, fontSize: fontSize),
+      );
+    }
     // 연결된 상태는 채워진 점(●), 그 외는 빈 점(○)으로 구분합니다.
     final bool filled = status == LinkStatus.connected || status == LinkStatus.pcIdle;
 
@@ -42,8 +57,8 @@ class ConnectionStatusBadge extends StatelessWidget {
       children: <Widget>[
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 9,
-          height: 9,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: filled ? color : Colors.transparent,
@@ -59,7 +74,7 @@ class ConnectionStatusBadge extends StatelessWidget {
           child: Text(
             linkStatusLabel(status),
             key: ValueKey<LinkStatus>(status),
-            style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -126,6 +141,50 @@ class LinkNotice extends StatelessWidget {
             style: TextButton.styleFrom(foregroundColor: color),
             child: const Text('다시 연결', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 카드 제목 옆의 "● 실시간" 표시.
+///
+/// PC 데이터가 실제로 들어오는 동안에만 "실시간"이고, 그 외에는 회색 "일시정지"로 바뀝니다.
+class LiveChip extends StatelessWidget {
+  const LiveChip({super.key, required this.status});
+
+  final LinkStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool live = status == LinkStatus.connected;
+    return AnimatedContainer(
+      duration: UpmMotion.normal,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF1F9),
+        borderRadius: BorderRadius.circular(UpmRadius.chip),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: live ? UpmColors.green : UpmColors.textMuted,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            live ? '실시간' : '일시정지',
+            style: const TextStyle(color: UpmColors.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+          if (live) ...const <Widget>[
+            SizedBox(width: 4),
+            Icon(Icons.monitor_heart_outlined, size: 13, color: UpmColors.blueBright),
+          ],
         ],
       ),
     );

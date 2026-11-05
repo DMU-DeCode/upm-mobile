@@ -1,20 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../config.dart';
 import '../format.dart';
 import '../status_controller.dart';
 import '../theme.dart';
 import '../widgets/connection_status.dart';
+import '../widgets/optimize_button.dart';
 import '../widgets/upm_card.dart';
+import '../widgets/upm_toast.dart';
 
 /// 설정 탭 — 연결 정보와 앱 정보.
 ///
-/// 알림 설정·다크모드 전환처럼 아직 실제 동작이 없는 항목은 넣지 않았습니다.
-/// (동작하지 않는 스위치를 화면에만 두지 않기 위해서입니다.)
+/// 알림 설정·고객센터처럼 아직 실제 동작이 없는 항목은 넣지 않았습니다.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.controller});
 
   final StatusController controller;
+
+  Future<void> _copyServerUrl(BuildContext context) async {
+    await Clipboard.setData(const ClipboardData(text: AppConfig.baseUrl));
+    if (!context.mounted) return;
+    showUpmToast(context, type: ToastType.info, title: '서버 주소를 복사했어요.');
+  }
+
+  void _showAppInfo(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: AppConfig.appName,
+      applicationVersion: '버전 ${AppConfig.appVersion}',
+      applicationLegalese: '동양미래대학교 컴퓨터소프트웨어공학과 졸업작품\nUniversal PC Manager',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,63 +43,59 @@ class SettingsScreen extends StatelessWidget {
           final LinkStatus status = controller.linkStatus;
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: screenListPadding(context),
             children: <Widget>[
               const ScreenTitle(title: '설정'),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               UpmCard(
                 title: '연결 정보',
                 icon: Icons.link_rounded,
+                trailing: ConnectionStatusBadge(status: status, chip: true, fontSize: 11),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
+                    _InfoRow(label: 'PC 이름', value: controller.machineId ?? 'N/A'),
                     _InfoRow(
-                      label: '연결 상태',
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: ConnectionStatusBadge(status: status),
+                      label: '서버 주소',
+                      value: AppConfig.baseUrl,
+                      action: IconButton(
+                        onPressed: () => _copyServerUrl(context),
+                        tooltip: '주소 복사',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.content_copy_rounded,
+                            size: 18, color: UpmColors.textSecondary),
                       ),
                     ),
-                    _InfoRow.text(label: 'PC 이름', value: controller.machineId ?? 'N/A'),
-                    const _InfoRow.text(label: '서버 주소', value: AppConfig.baseUrl),
-                    _InfoRow.text(
-                      label: '마지막 수신',
-                      value: formatClock(controller.lastSuccessAt),
-                    ),
+                    _InfoRow(label: '마지막 수신', value: formatClock(controller.lastSuccessAt)),
                     const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
+                    PrimaryActionButton(
+                      icon: Icons.refresh_rounded,
+                      label: '다시 연결',
                       height: 46,
-                      child: OutlinedButton.icon(
-                        onPressed: controller.reconnect,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text(
-                          '다시 연결',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: UpmColors.cyan,
-                          side: const BorderSide(color: UpmColors.cyan, width: 1.2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(UpmRadius.button),
-                          ),
-                        ),
-                      ),
+                      onPressed: controller.reconnect,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              const UpmCard(
-                title: '앱 정보',
-                icon: Icons.info_outline_rounded,
-                accent: UpmColors.purple,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    _InfoRow.text(label: '앱 이름', value: AppConfig.appName),
-                    _InfoRow.text(label: '버전', value: AppConfig.appVersion),
-                  ],
+              UpmCard(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: ListTile(
+                  onTap: () => _showAppInfo(context),
+                  leading: const Icon(Icons.info_outline_rounded, color: UpmColors.textPrimary),
+                  title: const Text(
+                    '앱 정보',
+                    style: TextStyle(
+                      color: UpmColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '${AppConfig.appName}  ·  버전 ${AppConfig.appVersion}',
+                    style: TextStyle(color: UpmColors.textSecondary, fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: UpmColors.textMuted),
                 ),
               ),
             ],
@@ -93,46 +106,41 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-/// "항목명 …… 값" 한 줄.
+/// "항목명 …… 값" 한 줄. 값이 길면 줄바꿈됩니다.
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.child}) : value = null;
-
-  const _InfoRow.text({required this.label, required this.value}) : child = null;
+  const _InfoRow({required this.label, required this.value, this.action});
 
   final String label;
-  final String? value;
-  final Widget? child;
+  final String value;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    final String? text = value;
-    final Widget? custom = child;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           SizedBox(
-            width: 84,
+            width: 76,
             child: Text(
               label,
               style: const TextStyle(color: UpmColors.textSecondary, fontSize: 13),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
-            child: custom ??
-                Text(
-                  text ?? 'N/A',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    color: UpmColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: UpmColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
+          ?action,
         ],
       ),
     );

@@ -1,26 +1,36 @@
 import 'package:flutter/material.dart';
 
-import 'format.dart';
 import 'status_controller.dart';
 import 'theme.dart';
 import 'widgets/connection_status.dart';
 import 'widgets/metric_gauge.dart';
+import 'widgets/quick_optimize_card.dart';
 import 'widgets/upm_card.dart';
+import 'widgets/upm_logo.dart';
+import 'widgets/usage_chart.dart';
 
-/// 홈 탭 — PC 연결 상태와 CPU / 메모리 / GPU 실시간 사용률.
+/// 홈 탭 — 로고·연결 상태, 시스템 사용 현황, 실시간 사용률, 빠른 최적화.
 ///
-/// 1초 폴링은 [StatusController] 로 옮겼고, 이 화면은 그 값을 보여 주기만 합니다.
-/// (그래프는 그래프 탭, 빠른 제어는 제어 탭으로 옮겼습니다.)
-class DashboardScreen extends StatelessWidget {
+/// 1초 폴링은 [StatusController] 가 하고, 이 화면은 그 값을 보여 주기만 합니다.
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.controller, this.onOpenSettings});
 
   final StatusController controller;
 
-  /// 오른쪽 위 설정 아이콘을 눌렀을 때.
+  /// 설정 아이콘이나 연결 상태 알약을 눌렀을 때 (설정 탭으로 이동).
   final VoidCallback? onOpenSettings;
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  int _rangeSeconds = kChartRanges.first;
+
+  @override
   Widget build(BuildContext context) {
+    final StatusController controller = widget.controller;
+
     return SafeArea(
       bottom: false,
       child: ListenableBuilder(
@@ -30,28 +40,54 @@ class DashboardScreen extends StatelessWidget {
 
           return RefreshIndicator(
             onRefresh: controller.refresh,
-            color: UpmColors.cyan,
-            backgroundColor: UpmColors.surfaceHigh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: screenListPadding(context),
               children: <Widget>[
-                _Header(status: status, onOpenSettings: onOpenSettings),
-                const SizedBox(height: 16),
-                _PcSummary(
+                _Header(
+                  status: status,
                   machineId: controller.machineId,
-                  lastSuccessAt: controller.lastSuccessAt,
+                  onOpenSettings: widget.onOpenSettings,
                 ),
                 if (status == LinkStatus.disconnected || status == LinkStatus.pcIdle) ...<Widget>[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   LinkNotice(status: status, onRetry: controller.reconnect),
                 ],
                 const SizedBox(height: 16),
                 UpmCard(
-                  title: '실시간 모니터',
-                  icon: Icons.monitor_heart_outlined,
+                  title: '시스템 사용 현황',
+                  icon: Icons.desktop_windows_rounded,
+                  trailing: LiveChip(status: status),
+                  padding: const EdgeInsets.fromLTRB(UpmSpace.card, 16, UpmSpace.card, 15),
+                  titleGap: 10,
                   child: _Gauges(controller: controller),
                 ),
+                const SizedBox(height: UpmSpace.section),
+                UpmCard(
+                  title: '실시간 사용률',
+                  icon: Icons.bar_chart_rounded,
+                  trailing: RangeSelector(
+                    seconds: _rangeSeconds,
+                    onChanged: (int value) => setState(() => _rangeSeconds = value),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      UsageChart(
+                        history: controller.history,
+                        metrics: UsageMetric.values,
+                        windowSeconds: _rangeSeconds,
+                        height: 104,
+                        compact: true,
+                      ),
+                      const SizedBox(height: 16),
+                      const ChartLegend(metrics: UsageMetric.values),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: UpmSpace.section),
+                const QuickOptimizeCard(),
               ],
             ),
           );
@@ -61,128 +97,164 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-/// 상단: UPM MOBILE 로고 · 연결 상태 · 설정 아이콘.
+/// 상단: 로고 + "Universal PC Manager" · 설정 버튼 / 연결 상태 알약.
 class _Header extends StatelessWidget {
-  const _Header({required this.status, required this.onOpenSettings});
+  const _Header({required this.status, required this.machineId, required this.onOpenSettings});
 
   final LinkStatus status;
+  final String? machineId;
   final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            ShaderMask(
-              blendMode: BlendMode.srcIn,
-              shaderCallback: (Rect bounds) => const LinearGradient(
-                colors: <Color>[UpmColors.cyan, UpmColors.blue, UpmColors.purple],
-              ).createShader(bounds),
-              child: const Text(
-                'UPM',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  height: 1.0,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  // 로고 이미지 바깥의 빛 번짐 여백만큼 왼쪽으로 당겨, 글자 위치를 카드 왼쪽 선에 맞춥니다.
+                  FractionalTranslation(
+                    translation: Offset(-0.07, 0),
+                    child: UpmLogo(height: 50),
+                  ),
+                  SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Flexible(
+                        child: Text(
+                          'Universal PC Manager',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: UpmColors.textSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 5),
+                      Icon(Icons.auto_awesome, size: 13, color: UpmColors.blueBright),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
-            const Text(
-              'MOBILE',
-              style: TextStyle(
-                color: UpmColors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 4,
+            const SizedBox(width: 12),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: UpmShadows.floating,
+              ),
+              child: Material(
+                type: MaterialType.transparency,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  onPressed: onOpenSettings,
+                  tooltip: '설정',
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.settings_outlined, size: 22, color: UpmColors.textPrimary),
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: ConnectionStatusBadge(status: status),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          onPressed: onOpenSettings,
-          tooltip: '설정',
-          icon: const Icon(Icons.settings_outlined, color: UpmColors.textPrimary),
-        ),
+        const SizedBox(height: 14),
+        _ConnectionPill(status: status, machineId: machineId, onTap: onOpenSettings),
       ],
     );
   }
 }
 
-/// 연결된 PC 이름과 마지막 수신 시각.
-class _PcSummary extends StatelessWidget {
-  const _PcSummary({required this.machineId, required this.lastSuccessAt});
+/// "● 연결됨 | DESKTOP-CAQDV23 ›" 흰색 캡슐. 누르면 설정(연결 정보)으로 이동합니다.
+class _ConnectionPill extends StatelessWidget {
+  const _ConnectionPill({required this.status, required this.machineId, required this.onTap});
 
+  final LinkStatus status;
   final String? machineId;
-  final DateTime? lastSuccessAt;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    // PC 이름은 서버가 알려 준 값만 표시합니다. 없으면 N/A.
-    final String pcName = machineId ?? 'N/A';
-    final String lastSeen = formatClock(lastSuccessAt);
+    final String? pcName = machineId;
+    final Color dot = linkStatusColor(status);
+    final BorderRadius radius = BorderRadius.circular(UpmRadius.chip);
 
-    return UpmCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: UpmColors.cyan.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.desktop_windows_outlined, color: UpmColors.cyan, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: radius,
+        border: Border.all(color: UpmColors.borderGlass),
+        boxShadow: UpmShadows.card,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Text(
-                  '실시간 모니터링',
-                  style: TextStyle(
+                AnimatedContainer(
+                  duration: UpmMotion.normal,
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  linkStatusLabel(status),
+                  style: const TextStyle(
                     color: UpmColors.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'PC  $pcName   ·   마지막 수신  $lastSeen',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: UpmColors.textSecondary, fontSize: 12),
-                ),
+                if (pcName != null) ...<Widget>[
+                  Container(
+                    width: 1,
+                    height: 12,
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    color: UpmColors.textMuted,
+                  ),
+                  Flexible(
+                    child: Text(
+                      pcName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: UpmColors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 2),
+                const Icon(Icons.chevron_right_rounded, size: 18, color: UpmColors.textSecondary),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// CPU / 메모리 / GPU 게이지 3개를 한 줄에 같은 폭으로 배치합니다.
+/// CPU / RAM / GPU 게이지 3개를 한 줄에 같은 폭·같은 크기로 배치합니다.
 class _Gauges extends StatelessWidget {
   const _Gauges({required this.controller});
 
@@ -192,30 +264,31 @@ class _Gauges extends StatelessWidget {
   Widget build(BuildContext context) {
     final double? used = controller.ramUsedGb;
     final double? total = controller.ramTotalGb;
-    final String? ramDetail = (used != null && total != null && total > 0)
-        ? '${used.toStringAsFixed(1)}GB / ${total.toStringAsFixed(0)}GB'
+    final String? ramCaption = (used != null && used > 0 && total != null && total > 0)
+        ? '${used.toStringAsFixed(1)} / ${total.toStringAsFixed(0)}GB'
         : null;
 
     final double? gpuTemp = controller.gpuTemp;
-    final String? gpuCaption = controller.gpu == null
-        ? null
-        : (gpuTemp == null ? '온도 N/A' : '${gpuTemp.toInt()}°C');
+    final String? gpuCaption = gpuTemp == null ? null : '${gpuTemp.toInt()}°C';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Expanded(child: MetricGauge(label: 'CPU 사용률', value: controller.cpu)),
-        Expanded(
-          child: MetricGauge(label: '메모리 사용률', value: controller.ram, detail: ramDetail),
-        ),
-        Expanded(
-          child: MetricGauge(
-            label: 'GPU 사용률',
-            value: controller.gpu,
-            centerCaption: gpuCaption,
-          ),
-        ),
+        Expanded(child: _gauge(UsageMetric.cpu, controller.cpu, null)),
+        Expanded(child: _gauge(UsageMetric.ram, controller.ram, ramCaption)),
+        Expanded(child: _gauge(UsageMetric.gpu, controller.gpu, gpuCaption)),
       ],
+    );
+  }
+
+  Widget _gauge(UsageMetric metric, double? value, String? caption) {
+    return MetricGauge(
+      label: metric.label,
+      icon: metric.icon,
+      value: value,
+      color: metric.color,
+      lightColor: metric.lightColor,
+      caption: caption,
     );
   }
 }

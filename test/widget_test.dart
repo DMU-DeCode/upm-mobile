@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:upm_app/app_shell.dart';
 import 'package:upm_app/dashboard.dart';
 import 'package:upm_app/main.dart';
 import 'package:upm_app/status_controller.dart';
@@ -19,23 +20,23 @@ void main() {
 
     await tester.pumpWidget(UpmApp(controller: controller));
 
-    NavigationBar bar() => tester.widget<NavigationBar>(find.byType(NavigationBar));
+    UpmBottomNav bar() => tester.widget<UpmBottomNav>(find.byType(UpmBottomNav));
     Finder tab(String label) =>
-        find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+        find.descendant(of: find.byType(UpmBottomNav), matching: find.text(label));
 
-    expect(find.byType(NavigationDestination), findsNWidgets(4));
+    expect(find.byType(UpmBottomNav), findsOneWidget);
     for (final String label in <String>['홈', '그래프', '제어', '설정']) {
       expect(tab(label), findsWidgets);
     }
     expect(bar().selectedIndex, 0);
 
-    // 제어 탭으로 이동하면 기존 제어 버튼 3개가 보여야 합니다.
+    // 제어 탭으로 이동하면 빠른 최적화 / 전원 끄기 / 다시 시작이 보여야 합니다.
     await tester.tap(tab('제어').first);
     await tester.pump(const Duration(milliseconds: 600));
     expect(bar().selectedIndex, 2);
     expect(find.text('빠른 최적화'), findsWidgets);
     expect(find.text('전원 끄기'), findsWidgets);
-    expect(find.text('PC 재시작'), findsWidgets);
+    expect(find.text('다시 시작'), findsWidgets);
 
     // 홈으로 돌아와 오른쪽 위 설정 아이콘을 누르면 설정 탭으로 이동합니다.
     await tester.tap(tab('홈').first);

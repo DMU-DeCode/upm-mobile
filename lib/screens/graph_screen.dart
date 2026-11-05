@@ -1,64 +1,97 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../status_controller.dart';
 import '../theme.dart';
 import '../widgets/connection_status.dart';
+import '../widgets/segmented.dart';
 import '../widgets/upm_card.dart';
+import '../widgets/usage_chart.dart';
 
-/// 그래프 탭 — CPU 사용량 추이 (최근 60초).
+/// 그래프 탭 — CPU / RAM / GPU 중 하나를 골라 실시간 추이와 통계를 봅니다.
 ///
-/// 기존 dashboard.dart 의 "CPU 사용량 추이 (실시간)" 그래프를 그대로 옮긴 것입니다.
-/// 그리는 값은 [StatusController] 가 서버에서 실제로 받은 값뿐입니다.
-class GraphScreen extends StatelessWidget {
-  const GraphScreen({super.key, required this.controller});
+/// 그리는 값과 통계는 [StatusController] 가 서버에서 실제로 받은 값뿐입니다.
+class GraphScreen extends StatefulWidget {
+  const GraphScreen({super.key, required this.controller, this.onBack});
 
   final StatusController controller;
 
-  /// 그래프에 표시할 범위(초). 기존과 동일하게 60초.
-  static const int _windowSeconds = 60;
+  /// 제목 옆 "<" 를 눌렀을 때 (홈 탭으로 이동).
+  final VoidCallback? onBack;
 
-  // 기록된 시각을 "지금으로부터 몇 초 전" (x = -60 ~ 0) 으로 바꿉니다.
-  List<FlSpot> _cpuSpots() {
-    final DateTime now = DateTime.now();
-    final List<FlSpot> spots = <FlSpot>[];
-    for (final UsageSample sample in controller.history) {
-      final double? cpu = sample.cpu;
-      if (cpu == null) continue;
-      final double secondsAgo = now.difference(sample.time).inMilliseconds / 1000.0;
-      if (secondsAgo > _windowSeconds) continue;
-      final double x = secondsAgo < 0 ? 0.0 : -secondsAgo;
-      spots.add(FlSpot(x, cpu.clamp(0.0, 100.0)));
-    }
-    return spots;
-  }
+  @override
+  State<GraphScreen> createState() => _GraphScreenState();
+}
+
+class _GraphScreenState extends State<GraphScreen> {
+  UsageMetric _metric = UsageMetric.cpu;
+  int _rangeSeconds = kChartRanges.first;
 
   @override
   Widget build(BuildContext context) {
+    final StatusController controller = widget.controller;
+
     return SafeArea(
       bottom: false,
       child: ListenableBuilder(
         listenable: controller,
         builder: (BuildContext context, Widget? child) {
+          final UsageStats stats =
+              UsageStats.from(controller.history, _metric, _rangeSeconds);
           final LinkStatus status = controller.linkStatus;
-          final List<FlSpot> spots = _cpuSpots();
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: screenListPadding(context),
             children: <Widget>[
               ScreenTitle(
-                title: '사용량 추이',
-                subtitle: '최근 $_windowSeconds초 동안 받은 실제 데이터입니다.',
-                trailing: ConnectionStatusBadge(status: status),
+                title: '그래프',
+                onBack: widget.onBack,
+                trailing: LiveChip(status: status),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              UpmSegmented<UsageMetric>(
+                options: UsageMetric.values,
+                selected: _metric,
+                onChanged: (UsageMetric value) => setState(() => _metric = value),
+                labelOf: (UsageMetric value) => value.label,
+                expand: true,
+              ),
+              const SizedBox(height: UpmSpace.section),
               UpmCard(
-                title: 'CPU 사용량 추이 (실시간)',
-                icon: Icons.show_chart_rounded,
-                accent: UpmColors.green,
-                child: spots.isEmpty
-                    ? const _EmptyChart()
-                    : SizedBox(height: 220, child: _CpuChart(spots: spots, windowSeconds: _windowSeconds)),
+                title: '${_metric.label} 사용률',
+                icon: Icons.query_stats_rounded,
+                accent: _metric.color,
+                trailing: RangeSelector(
+                  seconds: _rangeSeconds,
+                  onChanged: (int value) => setState(() => _rangeSeconds = value),
+                ),
+                child: UsageChart(
+                  history: controller.history,
+                  metrics: <UsageMetric>[_metric],
+                  windowSeconds: _rangeSeconds,
+                  height: 210,
+                ),
+              ),
+              const SizedBox(height: UpmSpace.section),
+              UpmCard(
+                title: '사용량 통계',
+                icon: Icons.insights_rounded,
+                trailing: Text('최근 ${rangeLabel(_rangeSeconds)}', style: UpmText.caption),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    _StatRow(icon: Icons.timer_outlined, label: '현재 사용률', value: stats.current),
+                    _StatRow(icon: Icons.arrow_upward_rounded, label: '최대 사용률', value: stats.max),
+                    _StatRow(icon: Icons.functions_rounded, label: '평균 사용률', value: stats.average),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  '그래프와 통계는 앱이 켜진 뒤 PC에서 받은 실제 값으로 그립니다.',
+                  style: TextStyle(color: UpmColors.textMuted, fontSize: 11, height: 1.4),
+                ),
               ),
             ],
           );
@@ -68,105 +101,38 @@ class GraphScreen extends StatelessWidget {
   }
 }
 
-class _EmptyChart extends StatelessWidget {
-  const _EmptyChart();
+class _StatRow extends StatelessWidget {
+  const _StatRow({required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final double? value;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 220,
-      child: Center(
-        child: Text(
-          '표시할 데이터가 없습니다.\nPC에서 데이터가 들어오면 그래프가 그려집니다.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: UpmColors.textMuted, fontSize: 13, height: 1.5),
-        ),
-      ),
-    );
-  }
-}
-
-class _CpuChart extends StatelessWidget {
-  const _CpuChart({required this.spots, required this.windowSeconds});
-
-  final List<FlSpot> spots;
-  final int windowSeconds;
-
-  @override
-  Widget build(BuildContext context) {
-    return LineChart(
-      LineChartData(
-        minY: 0,
-        maxY: 100,
-        minX: -windowSeconds.toDouble(),
-        maxX: 0,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 25,
-          getDrawingHorizontalLine: (double value) {
-            return const FlLine(color: Colors.white10, strokeWidth: 1);
-          },
-        ),
-        titlesData: FlTitlesData(
-          show: true,
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 15,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                const Map<int, String> labels = <int, String>{
-                  -60: '-60s',
-                  -45: '-45s',
-                  -30: '-30s',
-                  -15: '-15s',
-                  0: 'Now',
-                };
-                final String? label = labels[value.round()];
-                if (label == null) return const SizedBox.shrink();
-                return Text(
-                  label,
-                  style: const TextStyle(color: Colors.white30, fontSize: 9),
-                );
-              },
+    final double? v = value;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 18, color: UpmColors.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: UpmColors.textSecondary, fontSize: 13),
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 28,
-              interval: 25,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                return Text(
-                  '${value.round()}',
-                  style: const TextStyle(color: Colors.white30, fontSize: 10),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: <LineChartBarData>[
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            curveSmoothness: 0.15,
-            color: UpmColors.green,
-            barWidth: 2,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: UpmColors.green.withValues(alpha: 0.1),
+          Text(
+            v == null ? 'N/A' : '${v.round()}%',
+            style: const TextStyle(
+              color: UpmColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.linear,
     );
   }
 }

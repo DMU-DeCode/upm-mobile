@@ -37,6 +37,6 @@ class AppConfig {
   /// PC 시계와 휴대폰 시계의 차이.
   static const Duration pcFreshTolerance = Duration(seconds: 60);
 
-  /// 그래프용으로 보관하는 최근 데이터 범위.
+  /// 그래프용으로 보관하는 최근 데이터 범위 (그래프의 최대 선택 범위 '5분'과 같게).
   static const Duration historyWindow = Duration(minutes: 5);
 }

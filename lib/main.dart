@@ -50,6 +50,11 @@ class _UpmAppState extends State<UpmApp> {
       title: 'UPM Mobile App',
       debugShowCheckedModeBanner: false, // 오른쪽 위 디버그 띠 제거
       theme: buildUpmTheme(),
+      // 휴대폰 '글자 크기' 설정이 커도 디자인 비율이 무너지지 않도록 글자 배율을 최대 1.0 으로 고정합니다.
+      builder: (BuildContext context, Widget? child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.0,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: AppShell(controller: _controller), // 첫 화면: 하단 탭의 홈
     );
   }
