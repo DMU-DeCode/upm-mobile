@@ -13,7 +13,9 @@ class UsageService {
   static Future<List<Map<String, dynamic>>> getUsageHistory() async {
     try {
       final url = Uri.parse('$baseUrl/api/v1/metrics/history');
-      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      final response = await http
+          .get(url, headers: const <String, String>{'ngrok-skip-browser-warning': 'true'})
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         List<dynamic> body = json.decode(response.body);

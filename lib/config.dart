@@ -11,7 +11,7 @@ class AppConfig {
   static const String appVersion = '1.0.0';
 
   /// UPM 서버 주소 (ngrok 주소 사용).
-  static const String baseUrl = 'https://powdering-carry-uneasy.ngrok-free.dev';
+  static const String baseUrl = 'https://attendee-sequence-blooper.ngrok-free.dev';
 
   /// /status 폴링 주기 — 기존과 동일하게 1초.
   static const Duration pollInterval = Duration(seconds: 1);

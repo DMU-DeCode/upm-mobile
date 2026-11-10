@@ -164,7 +164,10 @@ class StatusController extends ChangeNotifier {
     bool ok = false;
     try {
       final http.Response response = await _client
-          .get(Uri.parse('${AppConfig.baseUrl}/status'))
+          .get(
+            Uri.parse('${AppConfig.baseUrl}/status'),
+            headers: const <String, String>{'ngrok-skip-browser-warning': 'true'},
+          )
           .timeout(AppConfig.statusTimeout);
       if (!_disposed && response.statusCode == 200) {
         final Object? data = json.decode(response.body);
